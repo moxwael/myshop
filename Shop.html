@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Small Shop — Demo</title>
+  <style>
+    :root{--accent:#2563eb;--bg:#f7f7fb;--card:#ffffff;--muted:#6b7280}
+    *{box-sizing:border-box}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial;background:var(--bg);margin:0;color:#111}
+    header{background:linear-gradient(90deg,#fff 0,#eef2ff 100%);padding:18px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:30;border-bottom:1px solid #e6e9ef}
+    .brand{font-weight:700;color:var(--accent);font-size:20px}
+    .controls{margin-left:auto;display:flex;gap:10px;align-items:center}
+    .search{padding:8px 12px;border-radius:8px;border:1px solid #e2e8f0;background:#fff;min-width:200px}
+    .container{max-width:1100px;margin:20px auto;padding:0 16px;display:grid;grid-template-columns:1fr 320px;gap:24px}
+    .products{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+    .card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(16,24,40,0.06);display:flex;flex-direction:column}
+    .thumb{height:140px;border-radius:8px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;justify-content:center}
+    .thumb img{width:100%;height:100%;object-fit:cover}
+    .title{font-weight:600;margin-bottom:6px}
+    .price{font-weight:700;color:var(--accent);margin-bottom:8px}
+    .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+    .btn{padding:8px 10px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer}
+    .small{font-size:13px;padding:6px 8px;border-radius:8px}
+    .sidebar{position:relative;background:transparent}
+    .cart{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(16,24,40,0.06)}
+    .cart h3{margin:0 0 8px 0}
+    .cart-list{max-height:420px;overflow:auto;margin-bottom:12px}
+    .cart-item{display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px solid #eef2ff;margin-bottom:8px}
+    .cart-item img{width:52px;height:52px;object-fit:cover;border-radius:6px}
+    .qty{display:flex;gap:6px;align-items:center}
+    .muted{color:var(--muted);font-size:13px}
+    footer{max-width:1100px;margin:18px auto;padding:0 16px;color:var(--muted);font-size:13px}
+    .topbar{display:flex;gap:8px;align-items:center}
+    select, input{font-family:inherit}
+    @media (max-width:900px){.container{grid-template-columns:1fr}.sidebar{order:2}.products{order:1}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">MiniShop</div>
+    <div class="topbar">
+      <input id="search" class="search" placeholder="Search products..." />
+      <select id="category" class="small">
+        <option value="all">All categories</option>
+      </select>
+      <select id="sort" class="small">
+        <option value="default">Sort</option>
+        <option value="price-asc">Price: Low → High</option>
+        <option value="price-desc">Price: High → Low</option>
+      </select>
+    </div>
+    <div class="controls">
+      <button id="open-cart" class="btn">Cart (<span id="cart-count">0</span>)</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section>
+      <div id="products" class="products" aria-live="polite"></div>
+    </section>
+
+    <aside class="sidebar">
+      <div class="cart" id="cart">
+        <h3>Your Cart</h3>
+        <div id="cart-list" class="cart-list"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="muted">Total: <strong id="cart-total">$0.00</strong></div>
+          <div style="display:flex;gap:8px">
+            <button id="clear-cart" class="small">Clear</button>
+            <button id="checkout" class="btn">Checkout</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div>Demo shop — static frontend. Cart saved in your browser (localStorage). Images are placeholders.</div>
+  </footer>
+
+  <script>
+    // ---------- Sample product data ----------
+    const PRODUCTS = [
+      {id:1,title:'Classic White T-Shirt',price:12.99,category:'Clothing',desc:'Soft cotton tee, unisex',img:'https://picsum.photos/seed/t1/600/400'},
+      {id:2,title:'Leather Wallet',price:29.50,category:'Accessories',desc:'Genuine leather',img:'https://picsum.photos/seed/w1/600/400'},
+      {id:3,title:'Espresso Mug',price:9.99,category:'Home',desc:'12oz ceramic mug',img:'https://picsum.photos/seed/m1/600/400'},
+      {id:4,title:'Denim Jacket',price:59.00,category:'Clothing',desc:'Slim fit denim',img:'https://picsum.photos/seed/j1/600/400'},
+      {id:5,title:'Bluetooth Earbuds',price:39.95,category:'Electronics',desc:'Noise-isolating fit',img:'https://picsum.photos/seed/b1/600/400'},
+      {id:6,title:'Notebook — A5',price:6.50,category:'Stationery',desc:'Hardcover ruled notebook',img:'https://picsum.photos/seed/n1/600/400'},
+      {id:7,title:'Canvas Tote Bag',price:14.25,category:'Accessories',desc:'Eco-friendly material',img:'https://picsum.photos/seed/t2/600/400'},
+      {id:8,title:'Desk Lamp',price:24.99,category:'Home',desc:'Adjustable LED lamp',img:'https://picsum.photos/seed/l1/600/400'}
+    ];
+
+    // ---------- Utilities ----------
+    const $ = (sel)=>document.querySelector(sel);
+    const $$ = (sel)=>Array.from(document.querySelectorAll(sel));
+
+    // ---------- State ----------
+    let state = {
+      products: PRODUCTS.slice(),
+      cart: JSON.parse(localStorage.getItem('mini_cart')||'{}'),
+      filter: {q:'',category:'all',sort:'default'}
+    };
+
+    // ---------- Init ----------
+    function init(){
+      populateCategories();
+      bindControls();
+      renderProducts();
+      renderCart();
+    }
+
+    // Populate category select
+    function populateCategories(){
+      const s = new Set(PRODUCTS.map(p=>p.category));
+      const select = $('#category');
+      s.forEach(cat=>{
+        const opt = document.createElement('option'); opt.value=cat; opt.textContent=cat; select.appendChild(opt);
+      });
+    }
+
+    // Controls
+    function bindControls(){
+      $('#search').addEventListener('input',(e)=>{state.filter.q=e.target.value.trim().toLowerCase(); renderProducts();});
+      $('#category').addEventListener('change',(e)=>{state.filter.category=e.target.value; renderProducts();});
+      $('#sort').addEventListener('change',(e)=>{state.filter.sort=e.target.value; renderProducts();});
+      $('#open-cart').addEventListener('click',()=>{document.querySelector('.cart').scrollIntoView({behavior:'smooth'});});
+      $('#checkout').addEventListener('click',checkout);
+      $('#clear-cart').addEventListener('click',clearCart);
+    }
+
+    // Render product cards
+    function renderProducts(){
+      const container = $('#products'); container.innerHTML='';
+      let list = state.products.slice();
+
+      // filters
+      if(state.filter.category!=='all') list = list.filter(p=>p.category===state.filter.category);
+      if(state.filter.q) list = list.filter(p=>(p.title+p.desc+p.category).toLowerCase().includes(state.filter.q));
+
+      // sort
+      if(state.filter.sort==='price-asc') list.sort((a,b)=>a.price-b.price);
+      if(state.filter.sort==='price-desc') list.sort((a,b)=>b.price-a.price);
+
+      if(list.length===0){container.innerHTML='<div style="padding:24px;background:#fff;border-radius:12px;text-align:center">No products found.</div>'; return}
+
+      for(const p of list){
+        const card = document.createElement('article'); card.className='card';
+        card.innerHTML = `
+          <div class="thumb"><img src="${p.img}" alt="${escapeHtml(p.title)}"></div>
+          <div class="title">${escapeHtml(p.title)}</div>
+          <div class="meta">${escapeHtml(p.category)} • <span class="muted">${escapeHtml(p.desc)}</span></div>
+          <div class="price">$${p.price.toFixed(2)}</div>
+          <div style="margin-top:auto;display:flex;gap:8px">
+            <button class="btn" data-add="${p.id}">Add</button>
+            <button class="small" data-view="${p.id}">View</button>
+          </div>
+        `;
+        container.appendChild(card);
+      }
+
+      // event delegation for add/view
+      container.querySelectorAll('[data-add]').forEach(btn=>btn.addEventListener('click',()=>addToCart(Number(btn.dataset.add))));
+      container.querySelectorAll('[data-view]').forEach(btn=>btn.addEventListener('click',()=>viewProduct(Number(btn.dataset.view))));
+    }
+
+    // Basic modal (native) for product view
+    function viewProduct(id){
+      const p = PRODUCTS.find(x=>x.id===id);
+      if(!p) return alert('Product not found');
+      const html = `\n        ${p.title}\n\n        ${p.desc}\n        Category: ${p.category}\n        Price: $${p.price.toFixed(2)}\n\n        (Image opens in new tab)`;
+      if(confirm(html+'\n\nOpen image in a new tab?')) window.open(p.img,'_blank');
+    }
+
+    // Cart functions
+    function saveCart(){ localStorage.setItem('mini_cart', JSON.stringify(state.cart)); renderCart(); }
+    function addToCart(id,qty=1){ state.cart[id] = (state.cart[id]||0) + qty; saveCart(); }
+    function removeFromCart(id){ delete state.cart[id]; saveCart(); }
+    function changeQty(id,qty){ if(qty<=0) removeFromCart(id); else state.cart[id]=qty; saveCart(); }
+    function clearCart(){ if(!confirm('Clear cart?')) return; state.cart={}; saveCart(); }
+
+    function renderCart(){
+      const listEl = $('#cart-list'); listEl.innerHTML='';
+      const ids = Object.keys(state.cart).map(x=>Number(x));
+      if(ids.length===0){ listEl.innerHTML = '<div class="muted">Cart is empty.</div>'; $('#cart-count').textContent = 0; $('#cart-total').textContent='$0.00'; return }
+      let total=0, count=0;
+      for(const id of ids){
+        const p = PRODUCTS.find(x=>x.id===id); if(!p) continue;
+        const q = state.cart[id]; total += p.price*q; count += q;
+        const it = document.createElement('div'); it.className='cart-item';
+        it.innerHTML = `
+          <img src="${p.img}" alt="${escapeHtml(p.title)}">
+          <div style="flex:1">
+            <div style="font-weight:600">${escapeHtml(p.title)}</div>
+            <div class="muted">$${p.price.toFixed(2)} each</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <div class="qty">
+              <button class="small" data-dec="${id}">-</button>
+              <div style="min-width:26px;text-align:center">${q}</div>
+              <button class="small" data-inc="${id}">+</button>
+            </div>
+            <div style="font-weight:700">$${(p.price*q).toFixed(2)}</div>
+            <button class="small" data-rem="${id}">Remove</button>
+          </div>
+        `;
+        listEl.appendChild(it);
+      }
+      // bind cart buttons
+      listEl.querySelectorAll('[data-inc]').forEach(b=>b.addEventListener('click',()=>{ changeQty(Number(b.dataset.inc), state.cart[Number(b.dataset.inc)]+1) }));
+      listEl.querySelectorAll('[data-dec]').forEach(b=>b.addEventListener('click',()=>{ changeQty(Number(b.dataset.dec), state.cart[Number(b.dataset.dec)]-1) }));
+      listEl.querySelectorAll('[data-rem]').forEach(b=>b.addEventListener('click',()=>{ if(confirm('Remove item?')) removeFromCart(Number(b.dataset.rem)) }));
+
+      $('#cart-count').textContent = count;
+      $('#cart-total').textContent = '$' + total.toFixed(2);
+    }
+
+    // Mock checkout
+    function checkout(){
+      const ids = Object.keys(state.cart); if(ids.length===0) return alert('Cart is empty');
+      // In a real app, you'd POST the cart to backend and handle payments.
+      alert('Checkout: total ' + $('#cart-total').textContent + '\n\n(This is a demo. Implement backend/payment to process orders.)');
+      // optional: clear cart after checkout
+      if(confirm('Simulate successful order and clear cart?')){ state.cart={}; saveCart(); }
+    }
+
+    // small helper to escape HTML (very small)
+    function escapeHtml(s){ return String(s).replace(/[&<>\"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+    // run
+    init();
+  </script>
+</body>
+</html>
